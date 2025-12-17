@@ -1,26 +1,26 @@
 /********************
- * CANVAS & CONTEXT
+ * CANVAS
  ********************/
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
 /********************
- * IMAGES (IMPORTANT)
+ * IMAGES (GitHub Pages safe paths)
  ********************/
-const bgImg = new Image();      // red brick background
-bgImg.src = "assets/image1.png";
+const bgImg = new Image();
+bgImg.src = "./assets/image1.png"; // red brick background
 
-const catImg = new Image();     // siamese cat
-catImg.src = "assets/image2.png";
+const catImg = new Image();
+catImg.src = "./assets/image2.png"; // siamese cat
 
-const coinImg = new Image();    // coin
-coinImg.src = "assets/image3.png";
+const coinImg = new Image();
+coinImg.src = "./assets/image3.png"; // coin
 
-const monsterImg = new Image();// monster
-monsterImg.src = "assets/image4.png";
+const monsterImg = new Image();
+monsterImg.src = "./assets/image4.png"; // monster
 
 /********************
- * DOM ELEMENTS
+ * DOM
  ********************/
 const startScreen = document.getElementById("startScreen");
 const endingScreen = document.getElementById("endingScreen");
@@ -46,7 +46,7 @@ let dialogueActive = false;
 /********************
  * TIMER
  ********************/
-const TIME_LIMIT = 90; // seconds
+const TIME_LIMIT = 90;
 let timeLeft = TIME_LIMIT;
 
 /********************
@@ -59,38 +59,37 @@ const player = {
     h: 70,
     vx: 0,
     vy: 0,
-    speed: 3,          // ✅ slower movement
+    speed: 3,        // slower movement
     jumpPower: 15,
-    jumpsLeft: 2,      // double jump
+    jumpsLeft: 2,    // double jump
     dashEnabled: false
 };
 
-const GRAVITY_NORMAL = 0.8;
-let gravity = GRAVITY_NORMAL;
+const GRAVITY_DEFAULT = 0.8;
+let gravity = GRAVITY_DEFAULT;
 
 /********************
- * WORLD DATA
+ * WORLD
  ********************/
 const camera = { x: 0 };
-
 let platforms = [];
 let coins = [];
 let monsters = [];
 
 /********************
- * NARRATIVE TRIGGERS
+ * NARRATIVE
  ********************/
 let dialogueTriggers = [600, 1400, 2200];
-let currentDialogueIndex = 0;
+let triggerIndex = 0;
 
 /********************
- * ITEM SYSTEM
+ * ITEMS
  ********************/
 let activeItem = null;
 let itemTimer = 0;
 
 /********************
- * INITIALIZE LEVEL
+ * INIT LEVEL
  ********************/
 function initLevel() {
     platforms = [];
@@ -128,12 +127,21 @@ function initLevel() {
             h: 60
         });
     }
+
+    player.x = 100;
+    player.y = 380;
+    player.vx = 0;
+    player.vy = 0;
+    player.jumpsLeft = 2;
+
+    timeLeft = TIME_LIMIT;
+    triggerIndex = 0;
 }
 
 /********************
  * COLLISION
  ********************/
-function rectHit(a, b) {
+function hit(a, b) {
     return (
         a.x < b.x + b.w &&
         a.x + a.w > b.x &&
@@ -153,8 +161,8 @@ function showDialogue() {
 document.querySelectorAll(".choiceBtn").forEach(btn => {
     btn.onclick = () => {
         applyItem(btn.dataset.item);
-        dialogueActive = false;
         dialogueBox.style.display = "none";
+        dialogueActive = false;
     };
 });
 
@@ -168,26 +176,21 @@ function applyItem(item) {
     if (item === "spring") {
         player.jumpPower = 22;
     }
-
     if (item === "fish") {
         player.speed = 5;
         player.dashEnabled = true;
     }
-
     if (item === "balloon") {
         gravity = 0.3;
     }
 }
 
-/********************
- * RESET ITEM
- ********************/
 function resetItem() {
     activeItem = null;
     player.jumpPower = 15;
     player.speed = 3;
     player.dashEnabled = false;
-    gravity = GRAVITY_NORMAL;
+    gravity = GRAVITY_DEFAULT;
 }
 
 /********************
@@ -225,7 +228,7 @@ function update(dt) {
     player.x += player.vx;
     player.y += player.vy;
 
-    // ground & platforms
+    // platforms & ground
     let grounded = false;
     for (let p of platforms) {
         if (
@@ -244,24 +247,24 @@ function update(dt) {
 
     // coins
     coins.forEach(c => {
-        if (!c.collected && rectHit(player, { ...c, w: 36, h: 36 })) {
+        if (!c.collected && hit(player, { ...c, w: 36, h: 36 })) {
             c.collected = true;
-            coinText.textContent =
-                `Coins: ${coins.filter(x => x.collected).length} / 10`;
+            const count = coins.filter(x => x.collected).length;
+            coinText.textContent = `Coins: ${count} / 10`;
         }
     });
 
     // monsters → restart
     monsters.forEach(m => {
-        if (rectHit(player, m)) restartGame();
+        if (hit(player, m)) restartGame();
     });
 
     // narrative triggers
     if (
-        currentDialogueIndex < dialogueTriggers.length &&
-        player.x > dialogueTriggers[currentDialogueIndex]
+        triggerIndex < dialogueTriggers.length &&
+        player.x > dialogueTriggers[triggerIndex]
     ) {
-        currentDialogueIndex++;
+        triggerIndex++;
         showDialogue();
     }
 
@@ -271,11 +274,8 @@ function update(dt) {
         if (itemTimer <= 0) resetItem();
     }
 
-    // win condition
-    if (
-        player.x > 3600 &&
-        coins.filter(c => c.collected).length >= 7
-    ) {
+    // win
+    if (player.x > 3600 && coins.filter(c => c.collected).length >= 7) {
         endGame(true);
     }
 
@@ -300,8 +300,7 @@ function draw() {
 
     // coins
     coins.forEach(c => {
-        if (!c.collected)
-            ctx.drawImage(coinImg, c.x, c.y, 36, 36);
+        if (!c.collected) ctx.drawImage(coinImg, c.x, c.y, 36, 36);
     });
 
     // monsters
@@ -316,40 +315,46 @@ function draw() {
 }
 
 /********************
- * GAME LOOP
+ * LOOP
  ********************/
-let lastTime = performance.now();
+let last = performance.now();
 function loop(now) {
-    const dt = (now - lastTime) / 1000;
-    lastTime = now;
-
+    const dt = (now - last) / 1000;
+    last = now;
     update(dt);
     draw();
     requestAnimationFrame(loop);
 }
 
 /********************
- * START / RESTART / END
+ * START / END
  ********************/
 function restartGame() {
     location.reload();
 }
 
-function endGame(success) {
+function endGame(win) {
     gameEnded = true;
     endingScreen.style.display = "flex";
-    endingScreen.querySelector("p").textContent = success
+    endingScreen.querySelector("p").textContent = win
         ? "Thank you for adventuring with me! Play again?"
         : "Time is up! Try again!";
 }
 
-// Start button
-document.getElementById("startBtn").onclick = () => {
-    startScreen.style.display = "none";
-    gameStarted = true;
-    initLevel();
-    requestAnimationFrame(loop);
-};
+/********************
+ * BUTTONS (safe binding)
+ ********************/
+const startBtn = document.getElementById("startBtn");
+if (startBtn) {
+    startBtn.onclick = () => {
+        startScreen.style.display = "none";
+        gameStarted = true;
+        initLevel();
+        requestAnimationFrame(loop);
+    };
+}
 
-// Restart button
-document.getElementById("restartBtn").onclick = () => location.reload();
+const restartBtn = document.getElementById("restartBtn");
+if (restartBtn) {
+    restartBtn.onclick = () => location.reload();
+}
